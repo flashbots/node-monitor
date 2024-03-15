@@ -15,6 +15,8 @@ import (
 )
 
 const (
+	defaultNamespace = "__default"
+
 	keyName      = "node_monitor_target_name"
 	keyNamespace = "node_monitor_target_namespace"
 )
@@ -40,6 +42,7 @@ func (s *Server) handleEventEthNewHeader(
 	} else {
 		attrs = []attribute.KeyValue{
 			{Key: keyName, Value: attribute.StringValue(name)},
+			{Key: keyNamespace, Value: attribute.StringValue(defaultNamespace)},
 		}
 	}
 
@@ -67,7 +70,9 @@ func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observ
 				{Key: keyNamespace, Value: attribute.StringValue(namespace)},
 			}
 		} else {
-			attrs = []attribute.KeyValue{}
+			attrs = []attribute.KeyValue{
+				{Key: keyNamespace, Value: attribute.StringValue(defaultNamespace)},
+			}
 		}
 
 		o.ObserveFloat64(
@@ -88,6 +93,7 @@ func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observ
 		} else {
 			attrs = []attribute.KeyValue{
 				{Key: keyName, Value: attribute.StringValue(name)},
+				{Key: keyNamespace, Value: attribute.StringValue(defaultNamespace)},
 			}
 		}
 

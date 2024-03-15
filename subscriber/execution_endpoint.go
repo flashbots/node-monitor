@@ -76,8 +76,6 @@ func (sub *ExecutionEndpoint) Subscribe(
 	}
 	sub.handler = handler
 
-	sub.subscribe(ctx)
-
 	go sub.run(ctx)
 
 	return nil
@@ -93,6 +91,7 @@ func (sub *ExecutionEndpoint) subscribe(ctx context.Context) (success bool) {
 	}
 
 	l := logutils.LoggerFromContext(ctx)
+
 	if sub.client == nil {
 		client, err := ethclient.Dial(sub.uri)
 		if err != nil {
@@ -133,6 +132,11 @@ func (sub *ExecutionEndpoint) run(ctx context.Context) {
 		if !sub.IsSubscribed() {
 			sub.ticker = time.NewTicker(sub.resubscribeInterval)
 
+			l.Info("Will (re-)subscribe to execution endpoint",
+				zap.Float64("delay_sec", sub.resubscribeInterval.Seconds()),
+				zap.String("id", sub.id),
+			)
+
 			// (re-)subscription loop
 		loopResubscribe:
 			for {
@@ -149,6 +153,7 @@ func (sub *ExecutionEndpoint) run(ctx context.Context) {
 						zap.String("id", sub.id),
 					)
 					sub.ticker.Stop()
+					sub.ticker = nil
 					return
 				}
 			}

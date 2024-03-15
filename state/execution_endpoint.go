@@ -7,7 +7,9 @@ import (
 )
 
 type ExecutionEndpoint struct {
-	id string
+	id        string
+	name      string
+	namespace string
 
 	highestBlock     *big.Int
 	highestBlockTime time.Time
@@ -15,13 +17,22 @@ type ExecutionEndpoint struct {
 	mx sync.RWMutex
 }
 
-func newExecutionEndpoint(id string) *ExecutionEndpoint {
+func newExecutionEndpoint(id, name, namespace string) *ExecutionEndpoint {
 	return &ExecutionEndpoint{
-		id: id,
+		id:        id,
+		name:      name,
+		namespace: namespace,
 
 		highestBlock:     big.NewInt(0),
 		highestBlockTime: time.Time{},
 	}
+}
+
+func (e *ExecutionEndpoint) Name() (name, namespace string) {
+	e.mx.RLock()
+	defer e.mx.RUnlock()
+
+	return e.name, e.namespace
 }
 
 func (e *ExecutionEndpoint) HighestBlock() *big.Int {

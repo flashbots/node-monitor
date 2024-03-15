@@ -31,16 +31,16 @@ func CommandServe(cfg *config.Config) *cli.Command {
 			Category:    categoryEth,
 			Destination: executionEndpoints,
 			EnvVars:     []string{"NODE_MONITOR_ETH_EL_ENDPOINTS"},
-			Name:        "eth-el-endpoints",
-			Usage:       "eth execution endpoints (websocket) in the format of `id=hostname:port`",
+			Name:        "eth-el-endpoint",
+			Usage:       "eth execution endpoints (websocket) in the format of `[namespace:]id=hostname:port`",
 		},
 
 		&cli.StringSliceFlag{
 			Category:    categoryEth,
 			Destination: externalExecutionEndpoints,
 			EnvVars:     []string{"NODE_MONITOR_ETH_EXT_EL_ENDPOINTS"},
-			Name:        "eth-ext-el-endpoints",
-			Usage:       "external eth execution endpoints (websocket) in the format of `id=hostname:port`",
+			Name:        "eth-ext-el-endpoint",
+			Usage:       "external eth execution endpoints (websocket) in the format of `[namespace:]id=hostname:port`",
 		},
 
 		&cli.DurationFlag{

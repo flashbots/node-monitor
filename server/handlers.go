@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"math/big"
 	"net/http"
 	"time"
 
@@ -18,20 +19,31 @@ func (s *Server) handleEventEthNewHeader(
 ) {
 	l := logutils.LoggerFromContext(ctx)
 
-	s.state.UpdateHighestBlockIfNeeded(header.Number, ts)
-	s.state.ExecutionEndpoint(id).UpdateHighestBlockIfNeeded(header.Number, ts)
+	ee := s.state.ExecutionEndpoint(id)
+	name, namespace := ee.Name()
 
-	latency := ts.Sub(s.state.HighestBlockTime())
+	s.state.UpdateHighestBlockIfNeeded(namespace, header.Number, ts)
+	ee.UpdateHighestBlockIfNeeded(header.Number, ts)
+
+	latency := ts.Sub(s.state.HighestBlockTime(namespace))
+	var attrs []attribute.KeyValue
+	if namespace != "" {
+		attrs = []attribute.KeyValue{
+			{Key: "name", Value: attribute.StringValue(name)},
+			{Key: "namespace", Value: attribute.StringValue(namespace)},
+		}
+	} else {
+		attrs = []attribute.KeyValue{
+			{Key: "name", Value: attribute.StringValue(name)},
+		}
+	}
 
 	s.metrics.newBlockLatency.Record(ctx,
 		latency.Seconds(),
-		metric.WithAttributes(attribute.KeyValue{
-			Key:   "instance_name",
-			Value: attribute.StringValue(id),
-		}),
+		metric.WithAttributes(attrs...),
 	)
 
-	l.Info("Received new header",
+	l.Debug("Received new header",
 		zap.String("block", header.Number.String()),
 		zap.String("id", id),
 		zap.Duration("latency", latency),
@@ -43,29 +55,41 @@ func (s *Server) handleHealthcheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observer) error {
-	o.ObserveFloat64(
-		s.metrics.secondsSinceLastBlock,
-		time.Since(s.state.HighestBlockTime()).Seconds(),
+	s.state.IterateNamespaces(func(namespace string, highestBlock *big.Int, highestBlockTime time.Time) {
+		var attrs []attribute.KeyValue
+		if namespace != "" {
+			attrs = []attribute.KeyValue{
+				{Key: "namespace", Value: attribute.StringValue(namespace)},
+			}
+		} else {
+			attrs = []attribute.KeyValue{}
+		}
 
-		metric.WithAttributes(
-			attribute.KeyValue{
-				Key:   "instance_name",
-				Value: attribute.StringValue("__global"),
-			},
-		),
-	)
+		o.ObserveFloat64(
+			s.metrics.secondsSinceLastBlock,
+			time.Since(highestBlockTime).Seconds(),
+			metric.WithAttributes(attrs...),
+		)
+	})
 
 	s.state.IterateExecutionEndpoints(func(id string, ee *state.ExecutionEndpoint) {
+		name, namespace := ee.Name()
+		var attrs []attribute.KeyValue
+		if namespace != "" {
+			attrs = []attribute.KeyValue{
+				{Key: "name", Value: attribute.StringValue(name)},
+				{Key: "namespace", Value: attribute.StringValue(namespace)},
+			}
+		} else {
+			attrs = []attribute.KeyValue{
+				{Key: "name", Value: attribute.StringValue(name)},
+			}
+		}
+
 		o.ObserveFloat64(
 			s.metrics.secondsSinceLastBlock,
 			time.Since(ee.HighestBlockTime()).Seconds(),
-
-			metric.WithAttributes(
-				attribute.KeyValue{
-					Key:   "instance_name",
-					Value: attribute.StringValue(id),
-				},
-			),
+			metric.WithAttributes(attrs...),
 		)
 	})
 

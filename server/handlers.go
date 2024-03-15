@@ -14,6 +14,11 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	keyName      = "node_monitor_target_name"
+	keyNamespace = "node_monitor_target_namespace"
+)
+
 func (s *Server) handleEventEthNewHeader(
 	ctx context.Context, id string, ts time.Time, header *ethtypes.Header,
 ) {
@@ -29,12 +34,12 @@ func (s *Server) handleEventEthNewHeader(
 	var attrs []attribute.KeyValue
 	if namespace != "" {
 		attrs = []attribute.KeyValue{
-			{Key: "name", Value: attribute.StringValue(name)},
-			{Key: "namespace", Value: attribute.StringValue(namespace)},
+			{Key: keyName, Value: attribute.StringValue(name)},
+			{Key: keyNamespace, Value: attribute.StringValue(namespace)},
 		}
 	} else {
 		attrs = []attribute.KeyValue{
-			{Key: "name", Value: attribute.StringValue(name)},
+			{Key: keyName, Value: attribute.StringValue(name)},
 		}
 	}
 
@@ -59,7 +64,7 @@ func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observ
 		var attrs []attribute.KeyValue
 		if namespace != "" {
 			attrs = []attribute.KeyValue{
-				{Key: "namespace", Value: attribute.StringValue(namespace)},
+				{Key: keyNamespace, Value: attribute.StringValue(namespace)},
 			}
 		} else {
 			attrs = []attribute.KeyValue{}
@@ -77,12 +82,12 @@ func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observ
 		var attrs []attribute.KeyValue
 		if namespace != "" {
 			attrs = []attribute.KeyValue{
-				{Key: "name", Value: attribute.StringValue(name)},
-				{Key: "namespace", Value: attribute.StringValue(namespace)},
+				{Key: keyName, Value: attribute.StringValue(name)},
+				{Key: keyNamespace, Value: attribute.StringValue(namespace)},
 			}
 		} else {
 			attrs = []attribute.KeyValue{
-				{Key: "name", Value: attribute.StringValue(name)},
+				{Key: keyName, Value: attribute.StringValue(name)},
 			}
 		}
 

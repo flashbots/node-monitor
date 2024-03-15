@@ -101,7 +101,7 @@ func (sub *ExecutionEndpoint) subscribe(ctx context.Context) (success bool) {
 			)
 			return false
 		}
-		l.Info("Connected to execution endpoint websocket",
+		l.Debug("Connected to execution endpoint websocket",
 			zap.String("id", sub.id),
 		)
 		sub.client = client

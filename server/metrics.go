@@ -87,6 +87,7 @@ func (m *metrics) setup(meter otelapi.Meter, observe func(ctx context.Context, o
 	// observables
 	if _, err := meter.RegisterCallback(observe,
 		m.highestBlock,
+		m.highestBlockLag,
 		m.timeSinceLastBlock,
 	); err != nil {
 		return err

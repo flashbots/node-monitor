@@ -115,7 +115,11 @@ func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observ
 			o.ObserveInt64(s.metrics.highestBlock, blockEndpoint, metric.WithAttributes(attrs...))
 
 			// endpoint's highest block lag
-			o.ObserveInt64(s.metrics.highestBlockLag, blockGroup-blockEndpoint, metric.WithAttributes(attrs...))
+			var lag int64
+			if blockGroup != 0 && blockEndpoint != 0 {
+				lag = blockGroup - blockEndpoint
+			}
+			o.ObserveInt64(s.metrics.highestBlockLag, lag, metric.WithAttributes(attrs...))
 
 			// endpoint's time since last block
 			o.ObserveFloat64(s.metrics.timeSinceLastBlock, tsBlockEndpoint.Seconds(), metric.WithAttributes(attrs...))

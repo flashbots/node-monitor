@@ -49,7 +49,7 @@ func CommandServe(cfg *config.Config) *cli.Command {
 			EnvVars:     []string{"NODE_MONITOR_RESUBSCRIBE_INTERVAL"},
 			Name:        "resubscribe-interval",
 			Usage:       "an `interval` at which the monitor will try to (re-)subscribe to node events",
-			Value:       15 * time.Second,
+			Value:       5 * time.Second,
 		},
 	}
 
@@ -98,6 +98,9 @@ func CommandServe(cfg *config.Config) *cli.Command {
 					parts[idx] = strings.TrimSpace(part)
 				}
 				id := parts[0]
+				if _, _, err := utils.ParseELEndpointID(id); err != nil {
+					return err
+				}
 				uri := parts[1]
 				parsed, err := utils.ParseRawURI(uri)
 				if err != nil {

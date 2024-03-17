@@ -2,47 +2,55 @@ package server
 
 import (
 	"context"
-	"math/big"
 	"net/http"
 	"time"
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/flashbots/node-monitor/logutils"
 	"github.com/flashbots/node-monitor/state"
+	"github.com/flashbots/node-monitor/utils"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 )
 
 const (
-	defaultNamespace = "__default"
+	defaultGroup  = "__default"
+	groupEndpoint = "__group"
 
-	keyName      = "node_monitor_target_name"
-	keyNamespace = "node_monitor_target_namespace"
+	keyTargetEndpoint = "node_monitor_target_endpoint"
+	keyTargetGroup    = "node_monitor_target_group"
+	keyTargetID       = "node_monitor_target_id"
 )
 
 func (s *Server) handleEventEthNewHeader(
-	ctx context.Context, id string, ts time.Time, header *ethtypes.Header,
+	ctx context.Context,
+	gname, ename string,
+	ts time.Time,
+	header *ethtypes.Header,
 ) {
 	l := logutils.LoggerFromContext(ctx)
 
-	ee := s.state.ExecutionEndpoint(id)
-	name, namespace := ee.Name()
+	block := header.Number
 
-	s.state.UpdateHighestBlockIfNeeded(namespace, header.Number, ts)
-	ee.UpdateHighestBlockIfNeeded(header.Number, ts)
+	g := s.state.ExecutionGroup(gname)
+	e := g.Endpoint(ename)
 
-	latency := ts.Sub(s.state.HighestBlockTime(namespace))
+	e.RegisterBlock(block, ts)
+	latency := g.RegisterBlockAndGetLatency(block, ts)
+
 	var attrs []attribute.KeyValue
-	if namespace != "" {
+	if gname != "" {
 		attrs = []attribute.KeyValue{
-			{Key: keyName, Value: attribute.StringValue(name)},
-			{Key: keyNamespace, Value: attribute.StringValue(namespace)},
+			{Key: keyTargetEndpoint, Value: attribute.StringValue(ename)},
+			{Key: keyTargetGroup, Value: attribute.StringValue(gname)},
+			{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
 		}
 	} else {
 		attrs = []attribute.KeyValue{
-			{Key: keyName, Value: attribute.StringValue(name)},
-			{Key: keyNamespace, Value: attribute.StringValue(defaultNamespace)},
+			{Key: keyTargetEndpoint, Value: attribute.StringValue(ename)},
+			{Key: keyTargetGroup, Value: attribute.StringValue(defaultGroup)},
+			{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
 		}
 	}
 
@@ -52,9 +60,10 @@ func (s *Server) handleEventEthNewHeader(
 	)
 
 	l.Debug("Received new header",
-		zap.String("block", header.Number.String()),
-		zap.String("id", id),
-		zap.Duration("latency", latency),
+		zap.String("block", block.String()),
+		zap.String("endpoint_group", gname),
+		zap.String("endpoint_name", ename),
+		zap.Duration("latency_s", latency),
 	)
 }
 
@@ -63,45 +72,51 @@ func (s *Server) handleHealthcheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observer) error {
-	s.state.IterateNamespaces(func(namespace string, highestBlock *big.Int, highestBlockTime time.Time) {
+	s.state.IterateELGroupsRO(func(gname string, g *state.ELGroup) {
 		var attrs []attribute.KeyValue
-		if namespace != "" {
+		if gname != "" {
 			attrs = []attribute.KeyValue{
-				{Key: keyNamespace, Value: attribute.StringValue(namespace)},
+				{Key: keyTargetEndpoint, Value: attribute.StringValue(groupEndpoint)},
+				{Key: keyTargetGroup, Value: attribute.StringValue(gname)},
 			}
 		} else {
 			attrs = []attribute.KeyValue{
-				{Key: keyNamespace, Value: attribute.StringValue(defaultNamespace)},
+				{Key: keyTargetGroup, Value: attribute.StringValue(defaultGroup)},
+				{Key: keyTargetEndpoint, Value: attribute.StringValue(groupEndpoint)},
 			}
 		}
 
-		o.ObserveFloat64(
-			s.metrics.secondsSinceLastBlock,
-			time.Since(highestBlockTime).Seconds(),
-			metric.WithAttributes(attrs...),
-		)
-	})
+		b, t := g.TimeSinceHighestBlock()
 
-	s.state.IterateExecutionEndpoints(func(id string, ee *state.ExecutionEndpoint) {
-		name, namespace := ee.Name()
-		var attrs []attribute.KeyValue
-		if namespace != "" {
-			attrs = []attribute.KeyValue{
-				{Key: keyName, Value: attribute.StringValue(name)},
-				{Key: keyNamespace, Value: attribute.StringValue(namespace)},
-			}
-		} else {
-			attrs = []attribute.KeyValue{
-				{Key: keyName, Value: attribute.StringValue(name)},
-				{Key: keyNamespace, Value: attribute.StringValue(defaultNamespace)},
-			}
-		}
+		// group's highest block
+		o.ObserveInt64(s.metrics.highestBlock, b, metric.WithAttributes(attrs...))
 
-		o.ObserveFloat64(
-			s.metrics.secondsSinceLastBlock,
-			time.Since(ee.HighestBlockTime()).Seconds(),
-			metric.WithAttributes(attrs...),
-		)
+		// group's time since last block
+		o.ObserveFloat64(s.metrics.timeSinceLastBlock, t.Seconds(), metric.WithAttributes(attrs...))
+
+		g.IterateEndpointsRO(func(ename string, e *state.ELEndpoint) {
+			if gname != "" {
+				attrs = []attribute.KeyValue{
+					{Key: keyTargetEndpoint, Value: attribute.StringValue(ename)},
+					{Key: keyTargetGroup, Value: attribute.StringValue(gname)},
+					{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
+				}
+			} else {
+				attrs = []attribute.KeyValue{
+					{Key: keyTargetEndpoint, Value: attribute.StringValue(ename)},
+					{Key: keyTargetGroup, Value: attribute.StringValue(defaultGroup)},
+					{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
+				}
+			}
+
+			b, t := e.TimeSinceHighestBlock()
+
+			// endpoint's highest block
+			o.ObserveInt64(s.metrics.highestBlock, b, metric.WithAttributes(attrs...))
+
+			// endpoint's time since last block
+			o.ObserveFloat64(s.metrics.timeSinceLastBlock, t.Seconds(), metric.WithAttributes(attrs...))
+		})
 	})
 
 	return nil

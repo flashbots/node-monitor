@@ -17,6 +17,7 @@ import (
 	"github.com/flashbots/node-monitor/prometheus"
 	"github.com/flashbots/node-monitor/state"
 	"github.com/flashbots/node-monitor/subscriber"
+	"github.com/flashbots/node-monitor/utils"
 	otelapi "go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 
@@ -31,7 +32,7 @@ type Server struct {
 	metrics *metrics
 	state   *state.State
 
-	subs map[string]*subscriber.ExecutionEndpoint
+	subs map[string]*subscriber.ELEndpoint
 }
 
 var (
@@ -54,7 +55,7 @@ func New(cfg *config.Config) (*Server, error) {
 	}
 
 	state := state.New()
-	subs := make(map[string]*subscriber.ExecutionEndpoint, len(cfg.Eth.ExecutionEndpoints))
+	subs := make(map[string]*subscriber.ELEndpoint, len(cfg.Eth.ExecutionEndpoints))
 	for _, rpc := range cfg.Eth.ExecutionEndpoints {
 		parts := strings.Split(rpc, "=")
 		id := parts[0]
@@ -64,14 +65,18 @@ func New(cfg *config.Config) (*Server, error) {
 				ErrExecutionEndpointDuplicateId, id,
 			)
 		}
-		sub, err := subscriber.NewExecutionEndpoint(cfg, id, uri)
+		group, name, err := utils.ParseELEndpointID(id)
+		if err != nil {
+			return nil, err
+		}
+		sub, err := subscriber.NewELEndpoint(cfg, group, name, uri)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w",
 				ErrExecutionEndpointFailedToSubscribe, err,
 			)
 		}
 		subs[id] = sub
-		if err := state.RegisterExecutionEndpoint(id); err != nil {
+		if err := state.RegisterExecutionEndpoint(group, name); err != nil {
 			return nil, fmt.Errorf("%w: %w",
 				ErrExecutionEndpointFailedToRegister, err,
 			)
@@ -134,17 +139,14 @@ func (s *Server) Run() error {
 		}
 	}()
 
-	for _, sub := range s.subs {
-		if err := sub.Subscribe(ctx, s.handleEventEthNewHeader); err != nil {
-			return fmt.Errorf("%w: %w",
-				ErrExecutionEndpointFailedToSubscribe, err,
-			)
-		}
-	}
-
 	l.Info("Starting up the monitor server...",
 		zap.String("server_listen_address", s.cfg.Server.ListenAddress),
 	)
+
+	for _, sub := range s.subs {
+		sub.Subscribe(ctx, s.handleEventEthNewHeader)
+	}
+
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		l.Error("Monitor server failed", zap.Error(err))
 	}

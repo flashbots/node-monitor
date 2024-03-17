@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	maxHistoryBlocks = 16
+	maxHistoryBlocks = 1024
 )
 
 type ELGroup struct {

@@ -86,13 +86,13 @@ func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observ
 			}
 		}
 
-		b, t := g.TimeSinceHighestBlock()
+		blockGroup, tsBlockGroup := g.TimeSinceHighestBlock()
 
 		// group's highest block
-		o.ObserveInt64(s.metrics.highestBlock, b, metric.WithAttributes(attrs...))
+		o.ObserveInt64(s.metrics.highestBlock, blockGroup, metric.WithAttributes(attrs...))
 
 		// group's time since last block
-		o.ObserveFloat64(s.metrics.timeSinceLastBlock, t.Seconds(), metric.WithAttributes(attrs...))
+		o.ObserveFloat64(s.metrics.timeSinceLastBlock, tsBlockGroup.Seconds(), metric.WithAttributes(attrs...))
 
 		g.IterateEndpointsRO(func(ename string, e *state.ELEndpoint) {
 			if gname != "" {
@@ -109,13 +109,16 @@ func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observ
 				}
 			}
 
-			b, t := e.TimeSinceHighestBlock()
+			blockEndpoint, tsBlockEndpoint := e.TimeSinceHighestBlock()
 
 			// endpoint's highest block
-			o.ObserveInt64(s.metrics.highestBlock, b, metric.WithAttributes(attrs...))
+			o.ObserveInt64(s.metrics.highestBlock, blockEndpoint, metric.WithAttributes(attrs...))
+
+			// endpoint's highest block lag
+			o.ObserveInt64(s.metrics.highestBlockLag, blockGroup-blockEndpoint, metric.WithAttributes(attrs...))
 
 			// endpoint's time since last block
-			o.ObserveFloat64(s.metrics.timeSinceLastBlock, t.Seconds(), metric.WithAttributes(attrs...))
+			o.ObserveFloat64(s.metrics.timeSinceLastBlock, tsBlockEndpoint.Seconds(), metric.WithAttributes(attrs...))
 		})
 	})
 

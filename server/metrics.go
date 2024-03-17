@@ -61,7 +61,29 @@ func (m *metrics) setup(meter otelapi.Meter, observe func(ctx context.Context, o
 
 	// new block latency
 	newBlockLatency, err := meter.Float64Histogram(metricNewBlockLatency,
-		metric.WithExplicitBucketBoundaries(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 1.5, 3, 6, 12, 24, 48, 96, 192, 384, 768),
+		metric.WithExplicitBucketBoundaries(
+			0.01171875, // 1/1024
+			0.0234375,  // 1//512
+			0.046875,   // 1/256
+			0.09375,    // 1/128
+			0.1875,     // 1/64
+			0.375,      // 1/32
+			0.75,       // 1/16
+			1.5,        // 1/8
+			3,          // 1/4
+			6,          // 1/2
+			12,         // 1      slot
+			24,         // 2x
+			48,         // 4x
+			96,         // 8x
+			192,        // 16x
+			384,        // 32x
+			768,        // 64x
+			1536,       // 128x
+			3072,       // 256x
+			6144,       // 512x
+			12288,      // 1024x
+		),
 		otelapi.WithDescription(metricDescriptions[metricNewBlockLatency]),
 		otelapi.WithUnit("s"),
 	)

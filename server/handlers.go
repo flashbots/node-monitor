@@ -18,9 +18,9 @@ const (
 	defaultTargetGroup   = "__default"
 	groupVirtualEndpoint = "__group"
 
-	keyTargetEndpoint = "node_monitor_target_endpoint"
-	keyTargetGroup    = "node_monitor_target_group"
-	keyTargetID       = "node_monitor_target_id"
+	keyTargetName  = "node_monitor_target_name"
+	keyTargetGroup = "node_monitor_target_group"
+	keyTargetID    = "node_monitor_target_id"
 )
 
 func (s *Server) handleEventEthNewHeader(
@@ -40,7 +40,7 @@ func (s *Server) handleEventEthNewHeader(
 	latency_s := g.RegisterBlockAndGetLatency(block, ts).Seconds()
 
 	attrs := []attribute.KeyValue{
-		{Key: keyTargetEndpoint, Value: attribute.StringValue(ename)},
+		{Key: keyTargetName, Value: attribute.StringValue(ename)},
 		{Key: keyTargetGroup, Value: attribute.StringValue(normalisedGroup(gname))},
 		{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
 	}
@@ -65,7 +65,7 @@ func (s *Server) handleHealthcheck(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observer) error {
 	s.state.IterateELGroupsRO(func(gname string, g *state.ELGroup) {
 		attrs := []attribute.KeyValue{
-			{Key: keyTargetEndpoint, Value: attribute.StringValue(groupVirtualEndpoint)},
+			{Key: keyTargetName, Value: attribute.StringValue(groupVirtualEndpoint)},
 			{Key: keyTargetGroup, Value: attribute.StringValue(normalisedGroup(gname))},
 		}
 
@@ -79,7 +79,7 @@ func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observ
 
 		g.IterateEndpointsRO(func(ename string, e *state.ELEndpoint) {
 			attrs := []attribute.KeyValue{
-				{Key: keyTargetEndpoint, Value: attribute.StringValue(ename)},
+				{Key: keyTargetName, Value: attribute.StringValue(ename)},
 				{Key: keyTargetGroup, Value: attribute.StringValue(normalisedGroup(gname))},
 				{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
 			}

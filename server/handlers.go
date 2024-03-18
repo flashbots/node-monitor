@@ -32,38 +32,49 @@ func (s *Server) handleEventEthNewHeader(
 	l := logutils.LoggerFromContext(ctx)
 
 	block := header.Number
+	blockStr := block.String()
 
 	g := s.state.ExecutionGroup(gname)
 	e := g.Endpoint(ename)
 
 	e.RegisterBlock(block, ts)
 	latency := g.RegisterBlockAndGetLatency(block, ts)
-	if latency == state.Infinity {
-		l.Warn("Skipping reporting block-latency on a very late block",
-			zap.String("block", block.String()),
+	latency_s := latency.Seconds()
+
+	switch latency {
+	case time.Duration(0):
+		l.Info("New block timestamp",
+			zap.String("block", blockStr),
+			zap.String("endpoint_group", gname),
+			zap.String("endpoint_name", ename),
+			zap.Time("ts", ts),
+		)
+	default:
+		l.Debug("Received new header",
+			zap.Float64("latency_s", latency_s),
+			zap.String("block", blockStr),
+			zap.String("endpoint_group", gname),
+			zap.String("endpoint_name", ename),
+			zap.Time("ts", ts),
+		)
+	case state.Infinity:
+		l.Info("Skipping reporting block-latency on a very late block",
+			zap.String("block", blockStr),
 			zap.String("endpoint_group", gname),
 			zap.String("endpoint_name", ename),
 		)
+		// don't bias the histogram
 		return
 	}
-	latency_s := latency.Seconds()
 
 	attrs := []attribute.KeyValue{
 		{Key: keyTargetName, Value: attribute.StringValue(ename)},
 		{Key: keyTargetGroup, Value: attribute.StringValue(normalisedGroup(gname))},
 		{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
 	}
-
 	s.metrics.newBlockLatency.Record(ctx,
 		latency_s,
 		metric.WithAttributes(attrs...),
-	)
-
-	l.Debug("Received new header",
-		zap.Float64("latency_s", latency_s),
-		zap.String("block", block.String()),
-		zap.String("endpoint_group", gname),
-		zap.String("endpoint_name", ename),
 	)
 }
 

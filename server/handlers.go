@@ -37,7 +37,16 @@ func (s *Server) handleEventEthNewHeader(
 	e := g.Endpoint(ename)
 
 	e.RegisterBlock(block, ts)
-	latency_s := g.RegisterBlockAndGetLatency(block, ts).Seconds()
+	latency := g.RegisterBlockAndGetLatency(block, ts)
+	if latency == state.Infinity {
+		l.Warn("Skipping reporting block-latency on a very late block",
+			zap.String("block", block.String()),
+			zap.String("endpoint_group", gname),
+			zap.String("endpoint_name", ename),
+		)
+		return
+	}
+	latency_s := latency.Seconds()
 
 	attrs := []attribute.KeyValue{
 		{Key: keyTargetName, Value: attribute.StringValue(ename)},

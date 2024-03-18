@@ -10,6 +10,10 @@ import (
 )
 
 const (
+	Infinity = time.Duration(9223372036854775807)
+)
+
+const (
 	maxHistoryBlocks = 1024
 )
 
@@ -88,19 +92,13 @@ func (g *ELGroup) RegisterBlockAndGetLatency(block *big.Int, ts time.Time) time.
 		g.mx.RLock()
 	}
 
-	// fill in the gaps (in case of missed block)
-	if prevTS, exists := g.blockTimes[blockStr]; !exists || ts.Before(prevTS) {
-		g.mx.RUnlock()
-		g.mx.Lock()
-		if prevTS, exists := g.blockTimes[blockStr]; !exists || ts.Before(prevTS) {
-			delete(g.blockTimes, g.blocks.InsertAndPop(blockStr))
-			g.blockTimes[blockStr] = ts
-		}
-		g.mx.Unlock()
-		g.mx.RLock()
+	prevTS, exists := g.blockTimes[blockStr]
+	if !exists {
+		// we don't want to report (false) statistics on obviously late blocks
+		return Infinity
 	}
 
-	return ts.Sub(g.blockTimes[blockStr])
+	return ts.Sub(prevTS)
 }
 
 func (g *ELGroup) TimeSinceHighestBlock() (block int64, timeSince time.Duration) {

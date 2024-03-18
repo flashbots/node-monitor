@@ -64,6 +64,11 @@ func (s *Server) handleHealthcheck(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observer) error {
 	s.state.IterateELGroupsRO(func(gname string, g *state.ELGroup) {
+		// don't report groups that did't progress yet
+		if g.HighestBlock().Sign() == 0 {
+			return
+		}
+
 		attrs := []attribute.KeyValue{
 			{Key: keyTargetName, Value: attribute.StringValue(groupVirtualEndpoint)},
 			{Key: keyTargetGroup, Value: attribute.StringValue(normalisedGroup(gname))},
@@ -78,6 +83,11 @@ func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observ
 		o.ObserveFloat64(s.metrics.timeSinceLastBlock, tsBlockGroup.Seconds(), metric.WithAttributes(attrs...))
 
 		g.IterateEndpointsRO(func(ename string, e *state.ELEndpoint) {
+			// don't report endpoints that did't progress yet
+			if e.HighestBlock().Sign() == 0 {
+				return
+			}
+
 			attrs := []attribute.KeyValue{
 				{Key: keyTargetName, Value: attribute.StringValue(ename)},
 				{Key: keyTargetGroup, Value: attribute.StringValue(normalisedGroup(gname))},

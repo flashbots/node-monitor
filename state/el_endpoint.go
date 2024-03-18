@@ -24,6 +24,13 @@ func newELEndpoint(name string) *ELEndpoint {
 	}
 }
 
+func (e *ELEndpoint) HighestBlock() *big.Int {
+	e.mx.RLock()
+	defer e.mx.RUnlock()
+
+	return big.NewInt(0).Set(e.highestBlock)
+}
+
 func (e *ELEndpoint) RegisterBlock(
 	block *big.Int,
 	ts time.Time,

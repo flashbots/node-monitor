@@ -54,9 +54,11 @@ func (g *ELGroup) registerEndpoint(name string) error {
 	return nil
 }
 
-func (g *ELGroup) Name() string {
-	// constant, no need for mutex
-	return g.name
+func (g *ELGroup) HighestBlock() *big.Int {
+	g.mx.RLock()
+	defer g.mx.RUnlock()
+
+	return big.NewInt(0).Set(g.highestBlock)
 }
 
 func (g *ELGroup) Endpoint(name string) *ELEndpoint {

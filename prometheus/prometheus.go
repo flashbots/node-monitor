@@ -20,7 +20,9 @@ func NewMeter(ctx context.Context, name string) (
 		return nil, err
 	}
 
-	exporter, err := prometheus.New(prometheus.WithNamespace("node-monitor"))
+	exporter, err := prometheus.New(
+		prometheus.WithNamespace("node-monitor"),
+	)
 	if err != nil {
 		return nil, err
 	}

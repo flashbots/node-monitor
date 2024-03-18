@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	defaultGroup  = "__default"
-	groupEndpoint = "__group"
+	defaultTargetGroup   = "__default"
+	groupVirtualEndpoint = "__group"
 
 	keyTargetEndpoint = "node_monitor_target_endpoint"
 	keyTargetGroup    = "node_monitor_target_group"
@@ -37,33 +37,24 @@ func (s *Server) handleEventEthNewHeader(
 	e := g.Endpoint(ename)
 
 	e.RegisterBlock(block, ts)
-	latency := g.RegisterBlockAndGetLatency(block, ts)
+	latency_s := g.RegisterBlockAndGetLatency(block, ts).Seconds()
 
-	var attrs []attribute.KeyValue
-	if gname != "" {
-		attrs = []attribute.KeyValue{
-			{Key: keyTargetEndpoint, Value: attribute.StringValue(ename)},
-			{Key: keyTargetGroup, Value: attribute.StringValue(gname)},
-			{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
-		}
-	} else {
-		attrs = []attribute.KeyValue{
-			{Key: keyTargetEndpoint, Value: attribute.StringValue(ename)},
-			{Key: keyTargetGroup, Value: attribute.StringValue(defaultGroup)},
-			{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
-		}
+	attrs := []attribute.KeyValue{
+		{Key: keyTargetEndpoint, Value: attribute.StringValue(ename)},
+		{Key: keyTargetGroup, Value: attribute.StringValue(normalisedGroup(gname))},
+		{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
 	}
 
 	s.metrics.newBlockLatency.Record(ctx,
-		latency.Seconds(),
+		latency_s,
 		metric.WithAttributes(attrs...),
 	)
 
 	l.Debug("Received new header",
+		zap.Float64("latency_s", latency_s),
 		zap.String("block", block.String()),
 		zap.String("endpoint_group", gname),
 		zap.String("endpoint_name", ename),
-		zap.Duration("latency_s", latency),
 	)
 }
 
@@ -73,17 +64,9 @@ func (s *Server) handleHealthcheck(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observer) error {
 	s.state.IterateELGroupsRO(func(gname string, g *state.ELGroup) {
-		var attrs []attribute.KeyValue
-		if gname != "" {
-			attrs = []attribute.KeyValue{
-				{Key: keyTargetEndpoint, Value: attribute.StringValue(groupEndpoint)},
-				{Key: keyTargetGroup, Value: attribute.StringValue(gname)},
-			}
-		} else {
-			attrs = []attribute.KeyValue{
-				{Key: keyTargetGroup, Value: attribute.StringValue(defaultGroup)},
-				{Key: keyTargetEndpoint, Value: attribute.StringValue(groupEndpoint)},
-			}
+		attrs := []attribute.KeyValue{
+			{Key: keyTargetEndpoint, Value: attribute.StringValue(groupVirtualEndpoint)},
+			{Key: keyTargetGroup, Value: attribute.StringValue(normalisedGroup(gname))},
 		}
 
 		blockGroup, tsBlockGroup := g.TimeSinceHighestBlock()
@@ -95,18 +78,10 @@ func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observ
 		o.ObserveFloat64(s.metrics.timeSinceLastBlock, tsBlockGroup.Seconds(), metric.WithAttributes(attrs...))
 
 		g.IterateEndpointsRO(func(ename string, e *state.ELEndpoint) {
-			if gname != "" {
-				attrs = []attribute.KeyValue{
-					{Key: keyTargetEndpoint, Value: attribute.StringValue(ename)},
-					{Key: keyTargetGroup, Value: attribute.StringValue(gname)},
-					{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
-				}
-			} else {
-				attrs = []attribute.KeyValue{
-					{Key: keyTargetEndpoint, Value: attribute.StringValue(ename)},
-					{Key: keyTargetGroup, Value: attribute.StringValue(defaultGroup)},
-					{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
-				}
+			attrs := []attribute.KeyValue{
+				{Key: keyTargetEndpoint, Value: attribute.StringValue(ename)},
+				{Key: keyTargetGroup, Value: attribute.StringValue(normalisedGroup(gname))},
+				{Key: keyTargetID, Value: attribute.StringValue(utils.MakeELEndpointID(gname, ename))},
 			}
 
 			blockEndpoint, tsBlockEndpoint := e.TimeSinceHighestBlock()
@@ -127,4 +102,11 @@ func (s *Server) handleEventPrometheusObserve(_ context.Context, o metric.Observ
 	})
 
 	return nil
+}
+
+func normalisedGroup(gname string) string {
+	if gname == "" {
+		return defaultTargetGroup
+	}
+	return gname
 }

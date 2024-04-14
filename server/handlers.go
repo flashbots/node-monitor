@@ -43,7 +43,7 @@ func (s *Server) handleEventEthNewHeader(
 
 	switch latency {
 	case time.Duration(0):
-		l.Info("New block timestamp",
+		l.Debug("New block timestamp",
 			zap.String("block", blockStr),
 			zap.String("endpoint_group", gname),
 			zap.String("endpoint_name", ename),

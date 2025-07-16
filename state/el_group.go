@@ -75,29 +75,23 @@ func (g *ELGroup) Endpoint(name string) *ELEndpoint {
 }
 
 func (g *ELGroup) RegisterBlockAndGetLatency(block *big.Int, blockHash common.Hash, ts time.Time) time.Duration {
-	g.mx.RLock()
-	defer g.mx.RUnlock()
+	g.mx.Lock()
+	defer g.mx.Unlock()
 
 	blockStr := utils.Bigint2string(block)
 
-	// update the highest block (if needed)
-	if blockStr > g.highestBlockStr {
-		g.mx.RUnlock()
-		g.mx.Lock()
-		if blockStr == g.highestBlockStr {
-			if blockHash != g.highestBlockHash {
-				g.blockTimes[blockStr] = ts
-				g.highestBlockHash = blockHash
-			}
-		} else if blockStr > g.highestBlockStr {
-			delete(g.blockTimes, g.blocks.InsertAndPop(blockStr))
-			g.highestBlock = big.NewInt(0).Set(block)
-			g.highestBlockStr = blockStr
-			g.highestBlockHash = blockHash
+	if blockStr == g.highestBlockStr {
+		if blockHash != g.highestBlockHash {
 			g.blockTimes[blockStr] = ts
+			g.highestBlockHash = blockHash
 		}
-		g.mx.Unlock()
-		g.mx.RLock()
+		// update the highest block (if needed)
+	} else if blockStr > g.highestBlockStr {
+		delete(g.blockTimes, g.blocks.InsertAndPop(blockStr))
+		g.highestBlock = big.NewInt(0).Set(block)
+		g.highestBlockStr = blockStr
+		g.highestBlockHash = blockHash
+		g.blockTimes[blockStr] = ts
 	}
 
 	prevTS, exists := g.blockTimes[blockStr]

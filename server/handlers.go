@@ -33,12 +33,13 @@ func (s *Server) handleEventEthNewHeader(
 
 	block := header.Number
 	blockStr := block.String()
+	blockHash := header.Hash()
 
 	g := s.state.ExecutionGroup(gname)
 	e := g.Endpoint(ename)
 
 	e.RegisterBlock(block, ts)
-	latency := g.RegisterBlockAndGetLatency(block, ts)
+	latency := g.RegisterBlockAndGetLatency(block, blockHash, ts)
 	latency_s := latency.Seconds()
 
 	switch latency {

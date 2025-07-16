@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/flashbots/node-monitor/utils"
 )
 
@@ -25,8 +26,9 @@ type ELGroup struct {
 	blocks     *utils.SortedStringQueue
 	blockTimes map[string]time.Time
 
-	highestBlock    *big.Int
-	highestBlockStr string
+	highestBlock     *big.Int
+	highestBlockHash common.Hash
+	highestBlockStr  string
 
 	mx sync.RWMutex
 }
@@ -72,7 +74,7 @@ func (g *ELGroup) Endpoint(name string) *ELEndpoint {
 	return g.endpoints[name]
 }
 
-func (g *ELGroup) RegisterBlockAndGetLatency(block *big.Int, ts time.Time) time.Duration {
+func (g *ELGroup) RegisterBlockAndGetLatency(block *big.Int, blockHash common.Hash, ts time.Time) time.Duration {
 	g.mx.RLock()
 	defer g.mx.RUnlock()
 
@@ -82,10 +84,16 @@ func (g *ELGroup) RegisterBlockAndGetLatency(block *big.Int, ts time.Time) time.
 	if blockStr > g.highestBlockStr {
 		g.mx.RUnlock()
 		g.mx.Lock()
-		if blockStr > g.highestBlockStr {
+		if blockStr == g.highestBlockStr {
+			if blockHash != g.highestBlockHash {
+				g.blockTimes[blockStr] = ts
+				g.highestBlockHash = blockHash
+			}
+		} else if blockStr > g.highestBlockStr {
 			delete(g.blockTimes, g.blocks.InsertAndPop(blockStr))
 			g.highestBlock = big.NewInt(0).Set(block)
 			g.highestBlockStr = blockStr
+			g.highestBlockHash = blockHash
 			g.blockTimes[blockStr] = ts
 		}
 		g.mx.Unlock()
